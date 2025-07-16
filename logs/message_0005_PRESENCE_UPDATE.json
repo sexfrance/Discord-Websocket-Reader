@@ -1,0 +1,25 @@
+{
+  "d": {
+    "activities": [],
+    "client_status": {},
+    "hidden_activities": [],
+    "processed_at_timestamp": 0,
+    "restricted_application": null,
+    "status": "offline",
+    "user": {
+      "avatar": "0999cf44aa0346e074bc3d18cd1bda7e",
+      "avatar_decoration_data": null,
+      "bot": false,
+      "clan": null,
+      "collectibles": null,
+      "discriminator": "0",
+      "global_name": "𝚏𝚞𝚞𝚒𝚘𝚗",
+      "id": 384068523854528524,
+      "primary_guild": null,
+      "username": "fuuion"
+    }
+  },
+  "op": 0,
+  "s": 3,
+  "t": "PRESENCE_UPDATE"
+}

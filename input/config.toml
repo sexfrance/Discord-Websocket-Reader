@@ -1,0 +1,5 @@
+[ data ]
+token = "" # Put your Discord account token here
+
+[ dev ]
+Debug = true # Set to true to see detailed logs
