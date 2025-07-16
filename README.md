@@ -1,7 +1,7 @@
 <div align="center">
   <h2 align="center">Discord Websocket Reader</h2>
   <p align="center">
-    A Python tool for connecting to the Discord Gateway, decompressing and decoding ETF payloads, and logging real-time Discord events with advanced logging and debug support.
+    A Python tool for connecting to the Discord Gateway, decompressing and decoding ETF payloads, and logging real-time Discord events with advanced logging and debug support. Made it in 30 minutes with AI.
     <br />
     <br />
     <a href="https://discord.cyberious.xyz">💬 Discord</a>
@@ -35,6 +35,7 @@
 - Configurable via `input/config.toml` (token, debug mode, etc.)
 - Clean JSON output for all Discord events
 - Automatic log file management
+- Used to fetch **discord session id** and **discord session heartbeat** in discord x-super-properties headers
 
 ---
 
