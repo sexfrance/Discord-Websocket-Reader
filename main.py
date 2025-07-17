@@ -88,23 +88,24 @@ class MiscUtils:
     def handle_large_json(self, json_str: str, event_type: str, message_count: int) -> str:
         filename = f"logs/message_{message_count:04d}_{event_type}.json"
         
-        if len(json_str) > 10000:
-            if self.save_json_to_file(json_str, filename):
+        # Always save to file
+        if self.save_json_to_file(json_str, filename):
+            if len(json_str) > 10000:
                 self.logger.info(f"HUGE MESSAGE ({len(json_str)} chars) - showing first 500 chars:")
                 print(json_str[:500] + "...")
-                self.logger.success(f"Full payload saved to: {filename}")
-            else:
-                self.logger.warning("Showing truncated JSON instead (first 1000 chars):")
-                print(json_str[:1000] + "...")
-        elif len(json_str) > 300:
-            if self.save_json_to_file(json_str, filename):
+            elif len(json_str) > 300:
                 print(json_str[:300] + "...")
-                self.logger.success(f"Full payload saved to: {filename}")
             else:
-                self.logger.warning("Showing full JSON instead:")
                 print(json_str)
+            self.logger.success(f"Full payload saved to: {filename}")
         else:
-            print(json_str)
+            # Fallback if file saving fails
+            if len(json_str) > 1000:
+                self.logger.warning("File save failed, showing truncated JSON (first 1000 chars):")
+                print(json_str[:1000] + "...")
+            else:
+                self.logger.warning("File save failed, showing full JSON:")
+                print(json_str)
         
         return filename
 
