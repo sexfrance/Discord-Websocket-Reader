@@ -39,7 +39,7 @@
 <div align="center">
   <h2 align="center">Discord Websocket Reader</h2>
   <p align="center">
-    A Python tool for connecting to the Discord Gateway, decompressing and decoding ETF payloads, and logging real-time Discord events with advanced logging and debug support. Made it in 30 minutes with AI.
+    A Python tool for connecting to the Discord Gateway, decompressing and decoding ETF payloads, and logging real-time Discord events with advanced logging and debug support. Supports replaying captured WebSocket sessions from <code>.bin</code> and <code>.har</code> files. Made it in 30 minutes with AI.
     <br />
     <br />
     <a href="https://discord.cyberious.xyz">💬 Discord</a>
@@ -56,7 +56,7 @@
 
 ### ⚙️ Installation
 
-- Requires: `Python 3.7+`
+- Requires: `Python 3.8+`
 - Create a virtual environment: `python -m venv venv`
 - Activate the environment: `venv\Scripts\activate` (Windows) / `source venv/bin/activate` (macOS, Linux)
 - Install dependencies: `pip install -r requirements.txt`
@@ -74,6 +74,7 @@
 - Clean JSON output for all Discord events
 - Automatic log file management
 - Used to fetch **discord session id** and **discord session heartbeat** in discord x-super-properties headers
+- Decode captured WebSocket sessions from `.bin` and `.har` files offline
 
 ---
 
@@ -101,7 +102,14 @@
    - All received Discord events are logged to the console
    - Large event payloads are saved to the `logs/` directory as JSON files
 
----
+#### Decode a captured `.bin` or `.har` file
+
+```bash
+python main.py --decode-bin capture.bin
+python main.py --decode-bin capture.har
+```
+
+Replays a captured WebSocket session offline without reconnecting. `.bin` files use the `\n\n---\n\n` separator format; `.har` files are exported from browser DevTools (Chrome / Firefox) with base64-encoded binary frames. Format is auto-detected from the extension. All decoded events are saved to `logs/`.
 
 ---
 
@@ -122,6 +130,12 @@
 ### 📜 ChangeLog
 
 ```diff
+v0.0.2 ⋮ 05/01/2026
++ Added --decode-bin flag to replay captured .bin and .har files offline
++ HAR support: base64 binary frames decoded via streaming zlib context
++ .bin support: separator-based format with graceful handling of corrupted binary frames
++ Auto-detects file format from extension
+
 v0.0.1 ⋮ 07/17/2025
 ! Initial release: Discord Gateway connection, ETF/zstd support, event logging, and debug features
 ```
