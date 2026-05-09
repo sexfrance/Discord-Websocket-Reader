@@ -209,6 +209,13 @@ def _try_zlib_decompress(chunk: bytes) -> Optional[bytes]:
     return None
 
 
+def _parse_gateway_params(url: str) -> tuple[str, str]:
+    """Return (encoding, compression) from a gateway URL."""
+    from urllib.parse import urlparse, parse_qs
+    qs = parse_qs(urlparse(url).query)
+    return qs.get('encoding', ['json'])[0], qs.get('compress', [''])[0]
+
+
 def decode_har(har_path: str) -> None:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     DIVIDER = "-" * 80
@@ -230,60 +237,76 @@ def decode_har(har_path: str) -> None:
             continue
 
         url = entry.get('request', {}).get('url', '')
+        encoding, compression = _parse_gateway_params(url)
         log.info(f"WebSocket entry: {url}")
+        log.info(f"  encoding={encoding}, compression={compression or 'none'}")
 
-        zlib_ctx = zlib.decompressobj()
+        # Set up per-entry decompression contexts
+        zlib_ctx = zlib.decompressobj() if compression == 'zlib-stream' else None
+        zstd_ctx = zstd.ZstdDecompressor().decompressobj() if compression == 'zstd-stream' else None
+
+        def decompress_chunk(blob: bytes) -> Optional[bytes]:
+            try:
+                if zlib_ctx is not None:
+                    return zlib_ctx.decompress(blob)
+                if zstd_ctx is not None:
+                    return zstd_ctx.decompress(blob)
+                return blob
+            except Exception:
+                return None
+
+        def decode_payload(raw_bytes: bytes) -> Optional[dict]:
+            if encoding == 'etf':
+                try:
+                    obj = erlpack.unpack(raw_bytes)
+                    return utils.clean_for_json(obj)
+                except Exception:
+                    return None
+            try:
+                return json.loads(raw_bytes.decode('utf-8', errors='replace'))
+            except (json.JSONDecodeError, AttributeError):
+                return None
 
         for msg in ws_messages:
-            direction = msg.get('type', 'receive')   # 'send' or 'receive'
+            direction = msg.get('type', 'receive')
             opcode = msg.get('opcode', 1)
             raw = msg.get('data', '')
 
-            if opcode == 1 or direction == 'send':
-                # Text frame or client-sent: plain JSON
-                try:
-                    data = json.loads(raw)
-                except (json.JSONDecodeError, TypeError):
-                    skipped += 1
-                    continue
-                event_type = data.get('t') or f"op{data.get('op', direction)}"
-                message_count += 1
-                log.info(f"[{direction}] Message {message_count}: op={data.get('op')}, t={data.get('t')}")
-                json_str = json.dumps(data, indent=2, ensure_ascii=False)
-                utils.handle_large_json(json_str, event_type, message_count)
-                print(DIVIDER)
+            # Get raw bytes — text frames are stored as text, binary as base64
+            if opcode == 1:
+                payload_bytes = raw.encode('utf-8') if isinstance(raw, str) else raw
             else:
-                # Binary receive frame: base64-encoded zlib-stream chunk
                 try:
-                    compressed = base64.b64decode(raw)
+                    payload_bytes = base64.b64decode(raw)
                 except Exception:
                     skipped += 1
                     continue
-                try:
-                    decompressed = zlib_ctx.decompress(compressed)
-                    data = json.loads(decompressed.decode('utf-8', errors='replace'))
-                    event_type = data.get('t') or f"op{data.get('op', 'unknown')}"
-                    message_count += 1
-                    log.info(f"[{direction}] Message {message_count}: op={data.get('op')}, t={data.get('t')}")
-                    json_str = json.dumps(data, indent=2, ensure_ascii=False)
-                    utils.handle_large_json(json_str, event_type, message_count)
-                    print(DIVIDER)
-                except (zlib.error, json.JSONDecodeError):
-                    # Streaming context broken; try standalone
-                    decompressed = _try_zlib_decompress(compressed)
-                    if decompressed:
-                        try:
-                            data = json.loads(decompressed.decode('utf-8', errors='replace'))
-                            event_type = data.get('t') or f"op{data.get('op', 'unknown')}"
-                            message_count += 1
-                            log.info(f"[{direction}] Message {message_count}: op={data.get('op')}, t={data.get('t')}")
-                            json_str = json.dumps(data, indent=2, ensure_ascii=False)
-                            utils.handle_large_json(json_str, event_type, message_count)
-                            print(DIVIDER)
-                        except json.JSONDecodeError:
-                            skipped += 1
-                    else:
-                        skipped += 1
+
+            # Server frames may be compressed; client (send) frames usually aren't
+            data = None
+            if direction == 'receive' and (zlib_ctx or zstd_ctx):
+                decompressed = decompress_chunk(payload_bytes)
+                if decompressed:
+                    data = decode_payload(decompressed)
+
+            if data is None:
+                # Try as uncompressed (client send, or already plain)
+                data = decode_payload(payload_bytes)
+
+            if data is None:
+                skipped += 1
+                continue
+
+            if not isinstance(data, dict):
+                skipped += 1
+                continue
+
+            event_type = data.get('t') or f"op{data.get('op', direction)}"
+            message_count += 1
+            log.info(f"[{direction}] Message {message_count}: op={data.get('op')}, t={data.get('t')}")
+            json_str = json.dumps(data, indent=2, ensure_ascii=False)
+            utils.handle_large_json(json_str, event_type, message_count)
+            print(DIVIDER)
 
     if skipped:
         log.warning(f"{skipped} frame(s) could not be decoded")
